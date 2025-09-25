@@ -1,0 +1,38 @@
+import logging
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from .service import YoutubeService, get_youtube_service
+from models.user_tokens import YoutubeTokenRequest
+# Configure logging
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/youtube", tags=["youtube"])
+security = HTTPBearer()
+
+
+@router.post("/init-process", response_model=bool)
+async def init_process(
+        youtube_token_request: YoutubeTokenRequest, 
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+        youtube_service: YoutubeService = Depends(get_youtube_service)):
+    """
+    Returns True if youtube project is created successfully, False otherwise.
+    """
+    logger.info(f"Creating youtube project for user: {credentials.credentials}")
+    try:
+        token = credentials.credentials
+        
+        return await youtube_service.init_process(youtube_token_request, token)
+
+    except HTTPException as e:
+        logger.error(f"HTTP error during create youtube project: {e.detail}")
+        raise e
+    except Exception as e:
+        logger.error(f"Unexpected error during create youtube project: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to create youtube project")
+
+
+
+
+
+
