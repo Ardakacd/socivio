@@ -282,9 +282,9 @@ class YoutubeAdapter:
             user_tokens = await self.user_token_adapter.get_tokens_by_user_id(user_id, PlatformType.youtube)
             if not user_tokens:
                 raise HTTPException(status_code=404, detail="YouTube tokens not found")
-            print('user_tokens')
-            print(user_tokens.access_token)
-            print(user_tokens)
+            
+            
+            
 
             YOUTUBE_ANALYTICS_BASE_URL = "https://youtubeanalytics.googleapis.com/v2/reports"
 
