@@ -1,4 +1,3 @@
-from turtle import ht
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
@@ -49,7 +48,7 @@ class UserTokenAdapter:
             with httpx.Client() as client:
                 response = client.post(URL, headers=HEADERS, data=payload)
                 data = response.json()
-
+                
                 youtube_token = YoutubeToken(
                     access_token=data["access_token"],
                     refresh_token=data["refresh_token"],
