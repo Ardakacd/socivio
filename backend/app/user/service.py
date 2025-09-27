@@ -23,14 +23,14 @@ class UserService:
                 logger.warning(f"UserService: Login failed - user not found for email: {user.email}")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="E-posta veya şifre yanlış"
+                    detail="Email or password is incorrect"
                 )
 
             if not verify_password(user.password, db_user.password):
                 logger.warning(f"UserService: Login failed - incorrect password for email: {user.email}")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="E-posta veya şifre yanlış"
+                    detail="Email or password is incorrect"
                 )
 
             access_token = create_access_token(
@@ -147,13 +147,13 @@ class UserService:
     async def logout(self, token: str):
         try:
             verify_token(token)
-            return {"message": "Kullanıcı çıkış yapıldı"}
+            return {"message": "User logged out"}
         except HTTPException:
             raise
         except Exception:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Sunucu hatası"
+                detail="Server error"
             )
 
     async def get_user(self, token: str):
@@ -164,7 +164,7 @@ class UserService:
             if not user:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Kullanıcı bulunamadı"
+                    detail="User not found"
                 )
 
             return {
@@ -177,7 +177,7 @@ class UserService:
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Sunucu hatası"
+                detail="Server error"
             )
 
     async def update_user(self, token: str, user: User):
@@ -188,7 +188,7 @@ class UserService:
             if not existing_user:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Kullanıcı bulunamadı"
+                    detail="User not found"
                 )
 
             hashed_password = get_password_hash(user.password) if user.password else existing_user.password
@@ -209,7 +209,7 @@ class UserService:
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Sunucu hatası"
+                detail="Server error"
             )
 
     async def change_password(self, token: str, password_request: PasswordChangeRequest):
@@ -220,14 +220,14 @@ class UserService:
             if not existing_user:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Kullanıcı bulunamadı"
+                    detail="User not found"
                 )
 
             # Verify current password
             if not verify_password(password_request.current_password, existing_user.password):
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Mevcut şifre yanlış"
+                    detail="Current password is incorrect"
                 )
 
             # Hash new password
@@ -237,13 +237,13 @@ class UserService:
             user_data = UserUpdate(password=hashed_new_password)
             await self.user_adapter.update_user(existing_user.id, user_data)
 
-            return {"message": "Şifre başarıyla değiştirildi"}
+            return {"message": "Password changed successfully"}
         except HTTPException:
             raise
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Sunucu hatası"
+                detail="Server error"
             )
 
     async def delete_user(self, token: str):
@@ -253,13 +253,13 @@ class UserService:
             # Delete user using internal ID
             await self.user_adapter.delete_user(user_id)
 
-            return {"message": "Kullanıcı silindi"}
+            return {"message": "User deleted"}
         except HTTPException:
             raise
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Sunucu hatası"
+                detail="Server error"
             )
 
 
