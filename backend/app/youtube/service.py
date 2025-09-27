@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.database import get_async_db
 from fastapi import Depends
 from models.user_tokens import YoutubeTokenRequest
+from models.youtube import YoutubeReportRequest, YoutubeReport
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,23 @@ class YoutubeService:
         except Exception as e:
             logger.error(f"Unexpected error during request youtube tokens: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to request youtube tokens")
+
+    async def query_report(
+        self,
+        youtube_report_request: YoutubeReportRequest,
+        token: str
+    ) -> YoutubeReport:
+        try:
+
+            user_id = get_user_id_from_token(token)
+            return await self.youtube_adapter.query_report(youtube_report_request, user_id)
+        except HTTPException as e:
+            logger.error(f"HTTP error during query report: {e.detail}")
+            raise e
+        except Exception as e:
+            logger.error(f"Unexpected error during query report: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to query report")
+
 
    
 def get_youtube_service(db: AsyncSession = Depends(get_async_db)) -> YoutubeService:
