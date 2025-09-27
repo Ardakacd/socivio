@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     # Security settings
     SECRET_KEY: str = Field(..., description="Secret key for JWT tokens")
     ALGORITHM: str = Field(default="HS256", description="JWT algorithm")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, description="Access token expiration time")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=60, description="Access token expiration time")
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=30, description="Refresh token expiration time in days")
     
     # Server settings
