@@ -37,14 +37,14 @@ class FacebookAdapter:
             
             return True
 
-        except HTTPException as e:
+        except HTTPException:
             logger.error(f"HTTP error while creating project for user_id={user_id}: {e.detail}")
-            raise e
+            raise
         except Exception as e:
             logger.error(f"Unexpected error while creating project for user_id={user_id}: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to create project")
 
-    async def get_user_pages(self, user_id: str) -> UserFacebookPages:
+    async def get_user_pages(self, user_id: str, is_instagram: bool = False) -> UserFacebookPages:
         try:
             user_tokens = await self.user_token_adapter.get_tokens_by_user_id(user_id, PlatformType.facebook)
             if not user_tokens:
@@ -62,14 +62,14 @@ class FacebookAdapter:
             if "data" not in data:
                 logger.error(f"Failed to fetch Facebook pages: {data}")
                 raise HTTPException(status_code=400, detail="Failed to fetch Facebook pages")
-
-            pages = [FacebookPage(id=page["id"], name=page["name"]) for page in data["data"]]
-
+            
+            pages = [FacebookPage(id=page["id"], name=page["name"], access_token=page["access_token"] if is_instagram else None) for page in data["data"]]
+            
             return UserFacebookPages(facebook_pages=pages)
 
-        except HTTPException as e:
+        except HTTPException:
             logger.error(f"HTTP error during get_user_pages: {e.detail}")
-            raise e
+            raise
         except Exception as e:
             logger.error(f"FacebookAdapter.get_user_pages: Unexpected error {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to fetch Facebook pages")
@@ -123,12 +123,35 @@ class FacebookAdapter:
 
             return insights_data["data"]
 
-        except HTTPException as e:
+        except HTTPException:
             logger.error(f"HTTP error during get_page_insights: {e.detail}")
-            raise e
+            raise
         except Exception as e:
             logger.error(f"FacebookAdapter.get_page_insights: Unexpected error {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to fetch page insights")
+
+    async def get_instagram_accounts(self, user_id: str):
+        try:
+            pages = await self.get_user_pages(user_id, is_instagram=True)
+            instagram_accounts = []
+            for page in pages.facebook_pages:
+                url = f"https://graph.facebook.com/v21.0/{page.id}"
+                params = {
+                    "fields": "connected_instagram_account",
+                    "access_token": page.access_token,
+                }
+                resp = httpx.get(url, params=params).json()
+                print(resp)
+                print('here is the resp')
+                if "connected_instagram_account" in resp:
+                    instagram_accounts.append(resp["connected_instagram_account"])
+            return instagram_accounts 
+        except HTTPException:
+            logger.error(f"HTTP error during get_instagram_accounts: {e.detail}")
+            raise
+        except Exception as e:
+            logger.error(f"FacebookAdapter.get_instagram_accounts: Unexpected error {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to fetch instagram accounts")
 
 
     

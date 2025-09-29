@@ -29,7 +29,7 @@ class YoutubeService:
 
         except HTTPException as e:
             logger.error(f"HTTP error during request youtube tokens: {e.detail}")
-            raise e
+            raise
         except Exception as e:
             logger.error(f"Unexpected error during request youtube tokens: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to request youtube tokens")
@@ -45,10 +45,22 @@ class YoutubeService:
             return await self.youtube_adapter.query_report(youtube_report_request, user_id)
         except HTTPException as e:
             logger.error(f"HTTP error during query report: {e.detail}")
-            raise e
+            raise
         except Exception as e:
             logger.error(f"Unexpected error during query report: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to query report")
+
+
+    async def get_channels(self, token: str) -> list[dict]:
+        try:
+            user_id = get_user_id_from_token(token)
+            return await self.youtube_adapter.get_channels(user_id)
+        except HTTPException as e:
+            logger.error(f"HTTP error during get channels: {e.detail}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error during get channels: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to get channels")
 
 
    

@@ -59,7 +59,7 @@ class YoutubeAdapter:
 
         except HTTPException as e:
             logger.error(f"HTTP error while creating project for user_id={user_id}: {e.detail}")
-            raise e
+            raise
         except Exception as e:
             logger.error(f"Unexpected error while creating project for user_id={user_id}: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to create project")
@@ -318,9 +318,60 @@ class YoutubeAdapter:
                 return YoutubeReport(report=data.get('rows', []), ids=youtube_report_request.ids)
         except HTTPException as e:
             logger.error(f"HTTP error during query report: {e.detail}")
-            raise e
+            raise
         except Exception as e:
             logger.error(f"YouTubeAnalyticsAdapter: Unexpected error {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to query report")
+
+    async def get_channels(self, user_id: int) -> list[dict]:
+        """
+        Fetch all YouTube channels connected to the authenticated Google account.
+
+        Args:
+            user_id (int): ID of the user in your system
+
+        Returns:
+            list[dict]: A list of channels with id and snippet data
+        """
+        try:
+            user_tokens = await self.user_token_adapter.get_tokens_by_user_id(
+                user_id, PlatformType.youtube
+            )
+            if not user_tokens:
+                raise HTTPException(status_code=404, detail="YouTube tokens not found")
+
+            url = "https://www.googleapis.com/youtube/v3/channels"
+            params = {
+                "part": "id,snippet",
+                "mine": "true"
+            }
+            headers = {
+                "Authorization": f"Bearer {user_tokens.access_token}",
+                "Accept": "application/json"
+            }
+
+            logger.info(f"YouTubeAnalyticsAdapter: Fetching channels for user {user_id}")
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(url, params=params, headers=headers)
+                if resp.status_code != 200:
+                    error_msg = resp.text
+                    logger.error(f"YouTubeAnalyticsAdapter: Failed to fetch channels ({resp.status_code}): {error_msg}")
+                    raise HTTPException(status_code=resp.status_code, detail=error_msg)
+
+                data = resp.json()
+                channels = data.get("items", [])
+
+                if not channels:
+                    logger.warning(f"YouTubeAnalyticsAdapter: No channels found for user {user_id}")
+                    return []
+
+                logger.info(f"YouTubeAnalyticsAdapter: Found {len(channels)} channels for user {user_id}")
+                return channels
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"YouTubeAnalyticsAdapter: Unexpected error fetching channels for user {user_id}: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to fetch YouTube channels")
 
     

@@ -27,7 +27,7 @@ async def init_process(
 
     except HTTPException as e:
         logger.error(f"HTTP error during create youtube project: {e.detail}")
-        raise e
+        raise
     except Exception as e:
         logger.error(f"Unexpected error during create youtube project: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to create youtube project")
@@ -48,10 +48,30 @@ async def query_report(
 
     except HTTPException as e:
         logger.error(f"HTTP error during query youtube report: {e.detail}")
-        raise e
+        raise
     except Exception as e:
         logger.error(f"Unexpected error during query youtube report: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to query youtube report")
+
+@router.post("/channels", response_model=YoutubeReport)
+async def get_channels(
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+        youtube_service: YoutubeService = Depends(get_youtube_service)):
+    """
+    Returns youtube channels.
+    """
+    logger.info(f"Creating youtube project for user: {credentials.credentials}")
+    try:
+        token = credentials.credentials
+        
+        return await youtube_service.get_channels(token)
+
+    except HTTPException as e:
+        logger.error(f"HTTP error during get channels: {e.detail}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error during get channels: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get channels")
 
 
 

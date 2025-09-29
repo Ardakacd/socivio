@@ -27,7 +27,7 @@ async def init_process(
 
     except HTTPException as e:
         logger.error(f"HTTP error during create facebook project: {e.detail}")
-        raise e
+        raise
     except Exception as e:
         logger.error(f"Unexpected error during create facebook project: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to create facebook project")
@@ -47,7 +47,7 @@ async def get_user_pages(
 
     except HTTPException as e:
         logger.error(f"HTTP error during getting user pages: {e.detail}")
-        raise e
+        raise
     except Exception as e:
         logger.error(f"Unexpected error during getting user pages: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to getting user pages")
@@ -69,14 +69,31 @@ async def get_page_insights(
 
     except HTTPException as e:
         logger.error(f"HTTP error during getting page insights: {e.detail}")
-        raise e
+        raise
     except Exception as e:
         logger.error(f"Unexpected error during getting page insights: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to getting page insights")
 
 
+@router.get("/get-instagram-accounts", response_model=list[dict])
+async def get_instagram_accounts(
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+        facebook_service: FacebookService = Depends(get_facebook_service)):
+    """
+    Returns list of instagram accounts.
+    """
+    logger.info(f"Getting instagram accounts for user: {credentials.credentials}")
+    try:
+        token = credentials.credentials
+        
+        return await facebook_service.get_instagram_accounts(token)
 
-
+    except HTTPException as e:
+        logger.error(f"HTTP error during getting instagram accounts: {e.detail}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error during getting instagram accounts: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to getting instagram accounts")
 
 
 

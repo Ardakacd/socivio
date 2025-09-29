@@ -30,7 +30,7 @@ class FacebookService:
 
         except HTTPException as e:
             logger.error(f"HTTP error during request facebook tokens: {e.detail}")
-            raise e
+            raise
         except Exception as e:
             logger.error(f"Unexpected error during request facebook tokens: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to request facebook tokens")
@@ -43,7 +43,7 @@ class FacebookService:
 
         except HTTPException as e:
             logger.error(f"HTTP error during getting user pages: {e.detail}")
-            raise e
+            raise
         except Exception as e:
             logger.error(f"Unexpected error during getting user pages: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to getting user pages")
@@ -60,10 +60,22 @@ class FacebookService:
             return await self.facebook_adapter.get_page_insights(page_insight_request, user_id)
         except HTTPException as e:
             logger.error(f"HTTP error during getting page insights: {e.detail}")
-            raise e
+            raise
         except Exception as e:
             logger.error(f"Unexpected error during getting page insights: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to getting page insights")
+
+    async def get_instagram_accounts(self, token: str):
+        try:
+            user_id = get_user_id_from_token(token)
+            return await self.facebook_adapter.get_instagram_accounts(user_id)
+        except HTTPException as e:
+            logger.error(f"HTTP error during getting instagram accounts: {e.detail}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error during getting instagram accounts: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to getting instagram accounts")
+
 
 
    
