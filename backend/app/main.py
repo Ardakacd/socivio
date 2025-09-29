@@ -7,6 +7,7 @@ from core.config import settings
 from db.database import engine, Base
 from user import controller as user_controller
 from youtube import controller as youtube_controller
+from facebook import controller as facebook_controller
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -32,6 +33,7 @@ app.add_middleware(
 # Include API routers
 app.include_router(user_controller.router, prefix="/api")
 app.include_router(youtube_controller.router, prefix="/api")
+app.include_router(facebook_controller.router, prefix="/api")
 
 @app.get("/")
 async def root():
