@@ -31,7 +31,7 @@ class YoutubeAdapter:
         Create a new YouTube project and wait until it is fully created.
         
         Returns:
-            dict: The project info returned by Cloud Resource Manager.
+            bool: True if project is created successfully, False otherwise.
         """
         try:
             user_tokens = await self.user_token_adapter.request_youtube_tokens(youtube_token, user_id)
@@ -279,13 +279,12 @@ class YoutubeAdapter:
             JSON response from YouTube Analytics API, or None if failed
         """
         try:
+            print(youtube_report_request)
             user_tokens = await self.user_token_adapter.get_tokens_by_user_id(user_id, PlatformType.youtube)
             if not user_tokens:
                 raise HTTPException(status_code=404, detail="YouTube tokens not found")
             
             
-            
-
             YOUTUBE_ANALYTICS_BASE_URL = "https://youtubeanalytics.googleapis.com/v2/reports"
 
             params = {
