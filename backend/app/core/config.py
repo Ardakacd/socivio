@@ -9,13 +9,13 @@ class Settings(BaseSettings):
     """Application settings with environment-specific configuration."""
     
     # Environment settings
-    ENV: str = Field(default="development", description="Environment: development, staging, production")
-    DEBUG: bool = Field(default=True, description="Debug mode")
+    ENV: str = Field(..., description="Environment: development, staging, production")
+    DEBUG: bool = Field(..., description="Debug mode")
     API_V1_STR: str = Field(default="/api/v1", description="API version prefix")
     
     # CORS settings
     BACKEND_CORS_ORIGINS: Union[str, List[str]] = Field(
-        default="http://localhost:3000", 
+        ..., 
         description="Comma-separated list of allowed CORS origins"
     )
     
@@ -23,42 +23,46 @@ class Settings(BaseSettings):
     DATABASE_URL: str = Field(..., description="Database connection URL")
     
     # Database pool settings
-    DB_POOL_SIZE: int = Field(default=20, description="Database pool size")
-    DB_MAX_OVERFLOW: int = Field(default=30, description="Database max overflow")
-    DB_POOL_TIMEOUT: int = Field(default=30, description="Database pool timeout")
-    DB_POOL_RECYCLE: int = Field(default=3600, description="Database pool recycle time")
-    DB_POOL_PRE_PING: bool = Field(default=True, description="Database pool pre-ping")
+    DB_POOL_SIZE: int = Field(..., description="Database pool size")
+    DB_MAX_OVERFLOW: int = Field(..., description="Database max overflow")
+    DB_POOL_TIMEOUT: int = Field(..., description="Database pool timeout")
+    DB_POOL_RECYCLE: int = Field(..., description="Database pool recycle time")
+    DB_POOL_PRE_PING: bool = Field(..., description="Database pool pre-ping")
 
     
     # SSL settings
-    DB_SSL_MODE: Optional[str] = Field(default=None, description="Database SSL mode")
+    DB_SSL_MODE: Optional[str] = Field(..., description="Database SSL mode")
     DB_CONNECT_TIMEOUT: int = Field(default=10, description="Database connection timeout")
     
     # Security settings
     SECRET_KEY: str = Field(..., description="Secret key for JWT tokens")
-    ALGORITHM: str = Field(default="HS256", description="JWT algorithm")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=60, description="Access token expiration time")
-    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=30, description="Refresh token expiration time in days")
+    ALGORITHM: str = Field(..., description="JWT algorithm")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(..., description="Access token expiration time")
+    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(..., description="Refresh token expiration time in days")
     
     # Server settings
-    HOST: str = Field(default="0.0.0.0", description="Server host")
-    PORT: int = Field(default=8000, description="Server port")
+    HOST: str = Field(..., description="Server host")
+    PORT: int = Field(..., description="Server port")
 
     # LLM settings
-    OPENAI_API_KEY: Optional[str] = Field(default=None, description="OpenAI API key")
+    OPENAI_API_KEY: Optional[str] = Field(..., description="OpenAI API key")
     
     
     # Logging settings
-    LOG_LEVEL: str = Field(default="INFO", description="Logging level")
-    SQL_ECHO: bool = Field(default=False, description="SQL query logging")
+    LOG_LEVEL: str = Field(..., description="Logging level")
+    SQL_ECHO: bool = Field(..., description="SQL query logging")
     
     # Monitoring settings
-    HEALTH_CHECK_ENABLED: bool = Field(default=True, description="Enable health checks")
-    METRICS_ENABLED: bool = Field(default=True, description="Enable metrics collection")
+    HEALTH_CHECK_ENABLED: bool = Field(..., description="Enable health checks")
+    METRICS_ENABLED: bool = Field(..., description="Enable metrics collection")
 
     YOUTUBE_CLIENT_ID: str = Field(..., description="Youtube client ID")
     YOUTUBE_CLIENT_SECRET: str = Field(..., description="Youtube client secret")
     YOUTUBE_REDIRECT_URL: str = Field(..., description="Youtube redirect URI")
+
+    FACEBOOK_APP_ID: str = Field(..., description="Google app ID")
+    FACEBOOK_APP_SECRET: str = Field(..., description="Google app secret")
+    FACEBOOK_REDIRECT_URI: str = Field(..., description="Google redirect URI")
     
     
     @field_validator('BACKEND_CORS_ORIGINS', mode='before')
