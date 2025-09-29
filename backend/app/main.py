@@ -8,6 +8,7 @@ from db.database import engine, Base
 from user import controller as user_controller
 from youtube import controller as youtube_controller
 from facebook import controller as facebook_controller
+from user_tokens import controller as user_tokens_controller
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -26,7 +27,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
     allow_headers=["*"],
 )
 
@@ -34,6 +35,7 @@ app.add_middleware(
 app.include_router(user_controller.router, prefix="/api")
 app.include_router(youtube_controller.router, prefix="/api")
 app.include_router(facebook_controller.router, prefix="/api")
+app.include_router(user_tokens_controller.router, prefix="/api")
 
 @app.get("/")
 async def root():

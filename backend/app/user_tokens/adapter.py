@@ -1,7 +1,7 @@
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
-from sqlalchemy import select
+from sqlalchemy import select, delete
 import logging
 from fastapi import HTTPException
 from db.models.user_tokens import UserTokenModel, PlatformType
@@ -327,7 +327,6 @@ class UserTokenAdapter:
     async def refresh_facebook_token(self, db_token: UserTokenModel) -> Optional[UserTokenModel]:
         """
         Refresh a Facebook long-lived token before it expires.
-        Should be called by a background job or on API error 190.
         """
         try:
             logger.info(f"Refreshing Facebook token for user_id={db_token.user_id}")
@@ -337,7 +336,24 @@ class UserTokenAdapter:
             raise
         except Exception as e:
             logger.error(f"Failed to refresh Facebook token for user_id={db_token.user_id}: {e}")
-            raise e
+            raise
+
+    async def delete_users_all_tokens(self, user_id: int) -> bool:
+        """
+        Delete all tokens for a given user_id.
+        """
+        try:
+            logger.info(f"Deleting all tokens for user_id={user_id}")
+            await self.db.execute(delete(UserTokenModel).where(UserTokenModel.user_id == user_id))
+            await self.db.commit()
+            return True
+        except HTTPException:
+            await self.db.rollback() 
+            raise
+        except Exception as e:
+            await self.db.rollback() 
+            logger.error(f"Failed to delete all tokens for user_id={user_id}: {e}", exc_info=True)
+            raise
 
 
     
