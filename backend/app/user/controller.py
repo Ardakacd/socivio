@@ -167,5 +167,29 @@ async def change_password(
         )
 
 
+@router.delete("/delete-account")
+async def delete_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    user_service: UserService = Depends(get_user_service)
+):
+    """
+    Delete user account.
+    """
+    logger.info("User deletion attempt")
+    try:
+        token = credentials.credentials
+        result = await user_service.delete_user(token)
+        logger.info("User deletion successful")
+        return result
+
+    except HTTPException as e:
+        logger.error(f"HTTP error during user deletion: {e.detail}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error during user deletion: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
 
 
