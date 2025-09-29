@@ -6,7 +6,7 @@ from typing import List, Optional
 class FacebookPage(BaseModel):
     id: str
     name: str
-
+    access_token: Optional[str] = None
     model_config = ConfigDict(extra="forbid")
 
 class UserFacebookPages(BaseModel):
