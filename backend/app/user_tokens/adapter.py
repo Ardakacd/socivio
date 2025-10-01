@@ -5,10 +5,12 @@ from sqlalchemy import select, delete
 import logging
 from fastapi import HTTPException
 from db.models.user_tokens import UserTokenModel, PlatformType
-from models.user_tokens import YoutubeTokenRequest, YoutubeToken, CreateUserToken, FacebookTokenRequest, FacebookToken
+from models.user_tokens import YoutubeTokenRequest, YoutubeToken, CreateUserToken, FacebookTokenRequest, FacebookToken, FacebookUserInfo
 from core.config import settings
 import httpx
 from datetime import datetime, timedelta, timezone
+import base64
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +33,7 @@ class UserTokenAdapter:
         """
         
         try:
-            URL = "https://oauth2.googleapis.com/token"
+            TOKEN_URL = "https://oauth2.googleapis.com/token"
 
             HEADERS = {
                 "Content-Type": "application/x-www-form-urlencoded",
@@ -45,23 +47,29 @@ class UserTokenAdapter:
                 "grant_type": "authorization_code",
             }
 
-            with httpx.Client() as client:
-                response = client.post(URL, headers=HEADERS, data=payload)
+            async with httpx.AsyncClient() as client:
+                response = await client.post(TOKEN_URL, headers=HEADERS, data=payload)
                 data = response.json()
-                
-                youtube_token = YoutubeToken(
-                    access_token=data["access_token"],
-                    refresh_token=data["refresh_token"],
-                    expires_in=data["expires_in"]
-                )
 
-                user_token = CreateUserToken(
-                    user_id=user_id,
-                    tokens=youtube_token,
-                    platform=PlatformType.youtube
-                )
+                if "access_token" not in data:
+                    raise HTTPException(status_code=400, detail='Failed to get access token')
 
-                return await self.create_user_token(user_token)
+            user_google_id = self.__decode_id_token(data["id_token"])["sub"]
+    
+            youtube_token = YoutubeToken(
+                access_token=data["access_token"],
+                refresh_token=data["refresh_token"],
+                expires_in=data["expires_in"]
+            )
+
+            user_token = CreateUserToken(
+                user_id=user_id,
+                tokens=youtube_token,
+                external_id=user_google_id,
+                platform=PlatformType.youtube
+            )
+
+            return await self.create_user_token(user_token)
         except HTTPException as e:
             logger.error(f'HTTPException has occurred: {e}')
             raise
@@ -83,6 +91,7 @@ class UserTokenAdapter:
             # Check if token exists for user_id + platform
             query = select(UserTokenModel).where(
                 UserTokenModel.user_id == user_token.user_id,
+                UserTokenModel.external_id == user_token.external_id,
                 UserTokenModel.platform == user_token.platform,
             )
             result = await self.db.execute(query)
@@ -100,6 +109,7 @@ class UserTokenAdapter:
                     access_token=user_token.tokens.access_token,
                     refresh_token=user_token.tokens.refresh_token,
                     expires_at=expires_at,
+                    external_id=user_token.external_id,
                     platform=user_token.platform,
                 )
                 self.db.add(db_token)
@@ -129,7 +139,7 @@ class UserTokenAdapter:
             raise HTTPException(status_code=500, detail="Failed to create user token")
 
 
-    async def get_tokens_by_user_id(self, user_id: int, platform: Optional[PlatformType] = None) -> Optional[UserTokenModel]:
+    async def get_tokens_by_user_id(self, user_id: int, platform: Optional[PlatformType] = None, external_id: Optional[str] = None) -> Optional[UserTokenModel]:
         """
         Retrieve all tokens for a given user_id, filtered by platform.
         
@@ -140,44 +150,55 @@ class UserTokenAdapter:
         Returns:
             UserTokenModel instance if found, None otherwise
         """
-        logger.info(f"UserTokenAdapter: Fetching tokens for user_id={user_id}, platform={platform}")
-        try:
-            query = select(UserTokenModel).where(UserTokenModel.user_id == user_id).where(UserTokenModel.platform == platform)
+        logger.info(f"UserTokenAdapter: Fetching tokens for user_id={user_id}, platform={platform}, external_id={external_id}")
+        try:    
+            stmt = select(UserTokenModel).where(UserTokenModel.user_id == user_id)
+
+            if platform is not None:
+                stmt = stmt.where(UserTokenModel.platform == platform)
+
+            if external_id is not None:
+                stmt = stmt.where(UserTokenModel.external_id == external_id)
             
-            result = await self.db.execute(query)
-            tokens = result.scalar_one_or_none()
+            result = await self.db.execute(stmt)
+            tokens = result.scalars().all()
             
             if not tokens:
                 logger.info(f"UserTokenAdapter: No tokens found for user_id={user_id}, platform={platform}")
                 raise HTTPException(status_code=400, detail='No tokens found')
 
-            if platform == PlatformType.youtube and tokens.expires_at and datetime.now(timezone.utc) >= tokens.expires_at:
-                logger.info(f"UserTokenAdapter: YouTube token expired for user_id={user_id}, attempting refresh")
-                refreshed_tokens = await self.refresh_youtube_token(tokens)
-                if refreshed_tokens:
-                    return refreshed_tokens
-                else:
-                    logger.warning(f"UserTokenAdapter: Failed to refresh YouTube token for user_id={user_id}")
-                    raise HTTPException(status_code=400, detail='Failed to refresh YouTube token')
+            refreshed_tokens = []
 
-            # Facebook → refresh if near expiry (e.g., < 10 days left)
-            if platform == PlatformType.facebook and tokens.expires_at:
-                now = datetime.now(timezone.utc)
-                time_left = tokens.expires_at - now
-                if time_left.days <= 10:  
-                    logger.info(
-                        f"UserTokenAdapter: Facebook token expiring soon "
-                        f"(in {time_left.days} days) for user_id={user_id}, attempting refresh"
-                    )
-                    refreshed_tokens = await self.refresh_facebook_token(tokens)
-                    if refreshed_tokens:
-                        return refreshed_tokens
+            for token in tokens:
+                if token.platform == PlatformType.youtube and token.expires_at and datetime.now(timezone.utc) >= token.expires_at:
+                    logger.info(f"UserTokenAdapter: YouTube token expired for user_id={user_id}, attempting refresh")
+                    refreshed_youtube_token = await self.refresh_youtube_token(token)
+                    if refreshed_youtube_token:
+                        refreshed_tokens.append(refreshed_youtube_token)
                     else:
-                        logger.warning(f"UserTokenAdapter: Failed to refresh Facebook token for user_id={user_id}")
-                        raise HTTPException(status_code=400, detail="Failed to refresh Facebook token")
+                        logger.warning(f"UserTokenAdapter: Failed to refresh YouTube token for user_id={user_id}")
+                        raise HTTPException(status_code=400, detail='Failed to refresh YouTube token')
+
+                # Facebook → refresh if near expiry (e.g., < 10 days left)
+                elif token.platform == PlatformType.facebook and token.expires_at:
+                    now = datetime.now(timezone.utc)
+                    time_left = token.expires_at - now
+                    if time_left.days <= 10:  
+                        logger.info(
+                            f"UserTokenAdapter: Facebook token expiring soon "
+                            f"(in {time_left.days} days) for user_id={user_id}, attempting refresh"
+                        )
+                        refreshed_tokens = await self.refresh_facebook_token(token)
+                        if refreshed_tokens:
+                            refreshed_tokens.append(refreshed_tokens)
+                        else:
+                            logger.warning(f"UserTokenAdapter: Failed to refresh Facebook token for user_id={user_id}")
+                            raise HTTPException(status_code=400, detail="Failed to refresh Facebook token")
+                else:
+                    refreshed_tokens.append(token)
 
 
-            return tokens
+            return refreshed_tokens
 
         except SQLAlchemyError as e:
             logger.error(f"UserTokenAdapter: Database error fetching tokens for user_id={user_id}, platform={platform}: {e}", exc_info=True)
@@ -212,8 +233,8 @@ class UserTokenAdapter:
                 "grant_type": "refresh_token",
             }
             
-            with httpx.Client() as client:
-                response = client.post(URL, headers=HEADERS, data=payload)
+            async with httpx.AsyncClient() as client:
+                response = await client.post(URL, headers=HEADERS, data=payload)
                 
                 if response.status_code != 200:
                     logger.error(f"UserTokenAdapter: YouTube token refresh failed with status {response.status_code}: {response.text}")
@@ -264,8 +285,8 @@ class UserTokenAdapter:
                 "code": facebook_token_request.code
             }
 
-            with httpx.Client() as client:
-                resp = client.get(short_lived_url, params=short_lived_params)
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(short_lived_url, params=short_lived_params)
                 short_lived_data = resp.json()
 
                 if "access_token" not in short_lived_data:
@@ -296,16 +317,18 @@ class UserTokenAdapter:
                 "fb_exchange_token": token,
             }
 
-            with httpx.Client() as client:
-                resp = client.get(long_lived_url, params=long_lived_params)
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(long_lived_url, params=long_lived_params)
                 long_lived_data = resp.json()
 
                 if "access_token" not in long_lived_data:
                     logger.error(f"Failed to get long-lived Facebook token: {long_lived_data}")
                     raise HTTPException(status_code=400, detail='Failed to get long-lived Facebook token')
 
-                access_token = long_lived_data["access_token"]
-                expires_in = long_lived_data.get("expires_in", 60 * 24 * 60 * 60)  # ~60 days
+            access_token = long_lived_data["access_token"]
+            expires_in = long_lived_data.get("expires_in", 60 * 24 * 60 * 60)  # ~60 days
+
+            user_info = await self.get_facebook_user_info(access_token)
 
             fb_token = FacebookToken(
                 access_token=access_token,
@@ -316,6 +339,7 @@ class UserTokenAdapter:
                 user_id=user_id,
                 tokens=fb_token,
                 platform=PlatformType.facebook,
+                external_id=user_info.external_id,
             )
 
             return await self.create_user_token(user_token)
@@ -355,5 +379,53 @@ class UserTokenAdapter:
             logger.error(f"Failed to delete all tokens for user_id={user_id}: {e}", exc_info=True)
             raise
 
+    async def get_facebook_user_info(self, access_token: str) -> FacebookUserInfo:
+        """
+        Fetch Facebook user info using the Graph API.
+
+        Args:
+            access_token (str): OAuth2 access token from Facebook login.
+
+        Returns:
+            FacebookUserInfo: Facebook user info id
+        """
+        url = "https://graph.facebook.com/v21.0/me"
+        params = {"fields": "id"}
+        headers = {"Authorization": f"Bearer {access_token}"}
+
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(url, params=params, headers=headers)
+                if resp.status_code != 200:
+                    logger.error(f"Failed to fetch Facebook userinfo: {resp.text}")
+                    raise HTTPException(status_code=resp.status_code, detail=resp.text)
+
+                data = resp.json()
+                logger.info(f"Facebook user info retrieved: {data}")
+                print(data)
+                print('here is the data')
+                return FacebookUserInfo(external_id=data["id"])
+                           
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to fetch Meta user info")
 
     
+    def __decode_id_token(self,id_token: str) -> dict:
+        # split token into parts
+        parts = id_token.split(".")
+        if len(parts) != 3:
+            raise ValueError("Invalid ID token")
+
+        payload = parts[1]
+
+        # pad Base64 string if necessary
+        padded = payload + "=" * (-len(payload) % 4)
+
+        # decode payload
+        decoded_bytes = base64.urlsafe_b64decode(padded)
+        decoded_json = decoded_bytes.decode("utf-8")
+        return json.loads(decoded_json)

@@ -55,8 +55,8 @@ class FacebookAdapter:
             url = "https://graph.facebook.com/v21.0/me/accounts"
             params = {"access_token": user_access_token}
 
-            with httpx.Client() as client:
-                resp = client.get(url, params=params)
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(url, params=params)
                 data = resp.json()
 
             if "data" not in data:
@@ -88,8 +88,8 @@ class FacebookAdapter:
             user_access_token = user_tokens.access_token
 
             url_pages = "https://graph.facebook.com/v21.0/me/accounts"
-            with httpx.Client() as client:
-                resp_pages = client.get(url_pages, params={"access_token": user_access_token})
+            async with httpx.AsyncClient() as client:
+                resp_pages = await client.get(url_pages, params={"access_token": user_access_token})
                 pages_data = resp_pages.json()
 
             if "data" not in pages_data:
@@ -113,8 +113,8 @@ class FacebookAdapter:
             if page_insight_request.until:
                 params["until"] = page_insight_request.until
 
-            with httpx.Client() as client:
-                resp_insights = client.get(url_insights, params=params)
+            async with httpx.AsyncClient() as client:
+                resp_insights = await client.get(url_insights, params=params)
                 insights_data = resp_insights.json()
 
             if "data" not in insights_data:
@@ -140,9 +140,8 @@ class FacebookAdapter:
                     "fields": "connected_instagram_account",
                     "access_token": page.access_token,
                 }
-                resp = httpx.get(url, params=params).json()
-                print(resp)
-                print('here is the resp')
+                resp = await httpx.AsyncClient().get(url, params=params).json()
+                
                 if "connected_instagram_account" in resp:
                     instagram_accounts.append(resp["connected_instagram_account"])
             return instagram_accounts 
