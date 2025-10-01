@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  reactStrictMode: false,
   images: {
     domains: ['scontent.cdninstagram.com', 'instagram.com', 'cdn.instagram.com'],
   },
