@@ -24,5 +24,9 @@ class FacebookToken(BaseModel):
 
 class CreateUserToken(BaseModel):
     user_id: int
+    external_id: str
     tokens: Union[YoutubeToken, FacebookToken]
     platform: PlatformType
+
+class FacebookUserInfo(BaseModel):
+    external_id: str
