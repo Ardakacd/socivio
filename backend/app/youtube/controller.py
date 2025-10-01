@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from .service import YoutubeService, get_youtube_service
 from models.user_tokens import YoutubeTokenRequest
-from models.youtube import YoutubeReport, YoutubeReportRequest
+from models.youtube import YoutubeReport, YoutubeReportRequest, YoutubeChannel
 # Configure logging 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ async def query_report(
         logger.error(f"Unexpected error during query youtube report: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to query youtube report")
 
-@router.post("/channels", response_model=YoutubeReport)
+@router.post("/channels", response_model=list[YoutubeChannel])
 async def get_channels(
         credentials: HTTPAuthorizationCredentials = Depends(security),
         youtube_service: YoutubeService = Depends(get_youtube_service)):

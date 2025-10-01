@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.database import get_async_db
 from fastapi import Depends
 from models.user_tokens import YoutubeTokenRequest
-from models.youtube import YoutubeReportRequest, YoutubeReport
+from models.youtube import YoutubeReportRequest, YoutubeReport, YoutubeChannel
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class YoutubeService:
             raise HTTPException(status_code=500, detail="Failed to query report")
 
 
-    async def get_channels(self, token: str) -> list[dict]:
+    async def get_channels(self, token: str) -> list[YoutubeChannel]:
         try:
             user_id = get_user_id_from_token(token)
             return await self.youtube_adapter.get_channels(user_id)

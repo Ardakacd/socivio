@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class YoutubeReportRequest(BaseModel):
@@ -12,3 +12,9 @@ class YoutubeReportRequest(BaseModel):
 class YoutubeReport(BaseModel):
     report: list[dict]
     ids: str
+
+class YoutubeChannel(BaseModel):
+    id: str
+    title: str
+    description: str
+    model_config = ConfigDict(extra="forbid")
