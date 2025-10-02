@@ -9,6 +9,8 @@ from user import controller as user_controller
 from youtube import controller as youtube_controller
 from facebook import controller as facebook_controller
 from user_tokens import controller as user_tokens_controller
+from accounts import controller as accounts_controller
+from projects import controller as projects_controller
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -36,6 +38,8 @@ app.include_router(user_controller.router, prefix="/api")
 app.include_router(youtube_controller.router, prefix="/api")
 app.include_router(facebook_controller.router, prefix="/api")
 app.include_router(user_tokens_controller.router, prefix="/api")
+app.include_router(accounts_controller.router, prefix="/api")
+app.include_router(projects_controller.router, prefix="/api")
 
 @app.get("/")
 async def root():
