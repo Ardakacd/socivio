@@ -7,7 +7,8 @@ from models.user_tokens import YoutubeTokenRequest
 from user_tokens.adapter import UserTokenAdapter
 import time
 import asyncio
-from models.youtube import YoutubeReportRequest, YoutubeReport, YoutubeChannel
+from models.youtube import YoutubeReportRequest, YoutubeReport, YoutubeChannel, YoutubeChannels
+from datetime import datetime
 
 
 logger = logging.getLogger(__name__)
@@ -323,7 +324,7 @@ class YoutubeAdapter:
             logger.error(f"YouTubeAnalyticsAdapter: Unexpected error {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to query report")
 
-    async def get_channels(self, user_id: int) -> list[YoutubeChannel]:
+    async def get_channels(self, user_id: int) -> YoutubeChannels:
         """
         Fetch all YouTube channels connected to the authenticated Google account.
 
@@ -344,11 +345,11 @@ class YoutubeAdapter:
             
         
             for user_token in user_tokens:
-                channels_for_token = await self.__get_user_channels_with_access_token(user_token.access_token)
+                channels_for_token = await self.__get_user_channels_with_access_token(user_token.access_token, user_token.created_at)
                 channels.extend(channels_for_token)
             
             
-            return channels
+            return YoutubeChannels(youtube_channels=channels)
 
         except HTTPException:
             raise
@@ -356,7 +357,7 @@ class YoutubeAdapter:
             logger.error(f"YouTubeAnalyticsAdapter: Unexpected error fetching channels for user {user_id}: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to fetch YouTube channels")
 
-    async def __get_user_channels_with_access_token(self, access_token: str) -> list[YoutubeChannel]:
+    async def __get_user_channels_with_access_token(self, access_token: str, created_at: datetime) -> list[YoutubeChannel]:
         """
         Get YouTube channels for the authenticated user.
 
@@ -391,6 +392,7 @@ class YoutubeAdapter:
                         id=item["id"],
                         title=item["snippet"]["title"],
                         description=item["snippet"].get("description"),
+                        connected_at=created_at,
                     )
                     for item in data.get("items", [])
                 ]

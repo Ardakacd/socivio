@@ -151,7 +151,7 @@ class UserTokenAdapter:
             UserTokenModel instance if found, None otherwise
         """
         logger.info(f"UserTokenAdapter: Fetching tokens for user_id={user_id}, platform={platform}, external_id={external_id}")
-        try:    
+        try:     
             stmt = select(UserTokenModel).where(UserTokenModel.user_id == user_id)
 
             if platform is not None:
@@ -162,7 +162,7 @@ class UserTokenAdapter:
             
             result = await self.db.execute(stmt)
             tokens = result.scalars().all()
-            
+
             if not tokens:
                 logger.info(f"UserTokenAdapter: No tokens found for user_id={user_id}, platform={platform}")
                 raise HTTPException(status_code=400, detail='No tokens found')
@@ -181,6 +181,7 @@ class UserTokenAdapter:
 
                 # Facebook → refresh if near expiry (e.g., < 10 days left)
                 elif token.platform == PlatformType.facebook and token.expires_at:
+
                     now = datetime.now(timezone.utc)
                     time_left = token.expires_at - now
                     if time_left.days <= 10:  
@@ -194,6 +195,8 @@ class UserTokenAdapter:
                         else:
                             logger.warning(f"UserTokenAdapter: Failed to refresh Facebook token for user_id={user_id}")
                             raise HTTPException(status_code=400, detail="Failed to refresh Facebook token")
+                    else:
+                        refreshed_tokens.append(token)
                 else:
                     refreshed_tokens.append(token)
 
