@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.database import get_async_db
 from fastapi import Depends
 from models.user_tokens import FacebookTokenRequest
-from models.facebook import UserFacebookPages, PageInsightRequest
+from models.facebook import UserFacebookPages, PageInsightRequest, InstagramAccounts, FacebookAndInstagramAccounts
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -35,11 +35,11 @@ class FacebookService:
             logger.error(f"Unexpected error during request facebook tokens: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to request facebook tokens")
 
-    async def get_user_pages(self, token: str) -> UserFacebookPages:
+    async def get_facebook_pages(self, token: str) -> UserFacebookPages:
         try:
             user_id = get_user_id_from_token(token)
             
-            return await self.facebook_adapter.get_user_pages(user_id)
+            return await self.facebook_adapter.get_facebook_pages(user_id)
 
         except HTTPException as e:
             logger.error(f"HTTP error during getting user pages: {e.detail}")
@@ -65,7 +65,7 @@ class FacebookService:
             logger.error(f"Unexpected error during getting page insights: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to getting page insights")
 
-    async def get_instagram_accounts(self, token: str):
+    async def get_instagram_accounts(self, token: str) -> InstagramAccounts:
         try:
             user_id = get_user_id_from_token(token)
             return await self.facebook_adapter.get_instagram_accounts(user_id)
@@ -75,6 +75,17 @@ class FacebookService:
         except Exception as e:
             logger.error(f"Unexpected error during getting instagram accounts: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to getting instagram accounts")
+
+    async def get_facebook_and_instagram_accounts(self, token: str) -> FacebookAndInstagramAccounts:
+        try:
+            user_id = get_user_id_from_token(token)
+            return await self.facebook_adapter.get_facebook_and_instagram_accounts(user_id)
+        except HTTPException as e:
+            logger.error(f"HTTP error during getting facebook and instagram accounts: {e.detail}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error during getting facebook and instagram accounts: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to getting facebook and instagram accounts")
 
 
 

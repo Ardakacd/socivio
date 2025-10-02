@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from .service import FacebookService, get_facebook_service
 from models.user_tokens import FacebookTokenRequest
-from models.facebook import UserFacebookPages, PageInsightRequest
+from models.facebook import UserFacebookPages, PageInsightRequest, InstagramAccounts, FacebookAndInstagramAccounts
 # Configure logging 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ async def init_process(
         raise HTTPException(status_code=500, detail="Failed to create facebook project")
 
 @router.get("/get-user-pages", response_model=UserFacebookPages)
-async def get_user_pages(
+async def get_facebook_pages(
         credentials: HTTPAuthorizationCredentials = Depends(security),
         facebook_service: FacebookService = Depends(get_facebook_service)):
     """
@@ -43,7 +43,7 @@ async def get_user_pages(
     try:
         token = credentials.credentials
         
-        return await facebook_service.get_user_pages(token)
+        return await facebook_service.get_facebook_pages(token)
 
     except HTTPException as e:
         logger.error(f"HTTP error during getting user pages: {e.detail}")
@@ -75,7 +75,7 @@ async def get_page_insights(
         raise HTTPException(status_code=500, detail="Failed to getting page insights")
 
 
-@router.get("/get-instagram-accounts", response_model=list[dict])
+@router.get("/get-instagram-accounts", response_model=InstagramAccounts)
 async def get_instagram_accounts(
         credentials: HTTPAuthorizationCredentials = Depends(security),
         facebook_service: FacebookService = Depends(get_facebook_service)):
@@ -94,6 +94,26 @@ async def get_instagram_accounts(
     except Exception as e:
         logger.error(f"Unexpected error during getting instagram accounts: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to getting instagram accounts")
+
+
+@router.get("/get-facebook-and-instagram-accounts", response_model=FacebookAndInstagramAccounts)
+async def get_facebook_and_instagram_accounts(
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+        facebook_service: FacebookService = Depends(get_facebook_service)):
+    """
+    Returns both facebook pages and instagram accounts.
+    """
+    logger.info(f"Getting facebook and instagram accounts for user: {credentials.credentials}")
+    try:
+        token = credentials.credentials
+        return await facebook_service.get_facebook_and_instagram_accounts(token)
+
+    except HTTPException as e:
+        logger.error(f"HTTP error during getting facebook and instagram accounts: {e.detail}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error during getting facebook and instagram accounts: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to getting facebook and instagram accounts")
 
 
 

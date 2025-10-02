@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import httpx
 from models.user_tokens import FacebookTokenRequest, PlatformType
 from user_tokens.adapter import UserTokenAdapter
-from models.facebook import UserFacebookPages, FacebookPage, PageInsightRequest
+from models.facebook import UserFacebookPages, FacebookPage, PageInsightRequest, InstagramAccounts, InstagramAccount, FacebookAndInstagramAccounts
 
 logger = logging.getLogger(__name__)
 
@@ -44,34 +44,31 @@ class FacebookAdapter:
             logger.error(f"Unexpected error while creating project for user_id={user_id}: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to create project")
 
-    async def get_user_pages(self, user_id: str, is_instagram: bool = False) -> UserFacebookPages:
+    async def get_facebook_pages(self, user_id: str, is_instagram: bool = False) -> UserFacebookPages:
         try:
             user_tokens = await self.user_token_adapter.get_tokens_by_user_id(user_id, PlatformType.facebook)
-            if not user_tokens:
-                raise HTTPException(status_code=404, detail="Facebook tokens not found")
+            pages: list[FacebookPage] = []
 
-            user_access_token = user_tokens.access_token
-
-            url = "https://graph.facebook.com/v21.0/me/accounts"
-            params = {"access_token": user_access_token}
-
-            async with httpx.AsyncClient() as client:
-                resp = await client.get(url, params=params)
-                data = resp.json()
-
-            if "data" not in data:
-                logger.error(f"Failed to fetch Facebook pages: {data}")
-                raise HTTPException(status_code=400, detail="Failed to fetch Facebook pages")
+            for token in user_tokens:
+                user_access_token = token.access_token
             
-            pages = [FacebookPage(id=page["id"], name=page["name"], access_token=page["access_token"] if is_instagram else None) for page in data["data"]]
+                url = "https://graph.facebook.com/v21.0/me/accounts"
+                params = {"access_token": user_access_token}
+
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(url, params=params)
+                    data = resp.json()
+
+                if "data" in data:
+                    pages.extend([FacebookPage(id=page["id"], name=page["name"], connected_at=token.created_at, access_token=page["access_token"] if is_instagram else None) for page in data["data"]])
             
             return UserFacebookPages(facebook_pages=pages)
 
-        except HTTPException:
-            logger.error(f"HTTP error during get_user_pages: {e.detail}")
+        except HTTPException as e:
+            logger.error(f"HTTP error during get_facebook_pages: {e.detail}")
             raise
         except Exception as e:
-            logger.error(f"FacebookAdapter.get_user_pages: Unexpected error {e}", exc_info=True)
+            logger.error(f"FacebookAdapter.get_facebook_pages: Unexpected error {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to fetch Facebook pages")
 
 
@@ -123,34 +120,71 @@ class FacebookAdapter:
 
             return insights_data["data"]
 
-        except HTTPException:
+        except HTTPException as e:
             logger.error(f"HTTP error during get_page_insights: {e.detail}")
             raise
         except Exception as e:
             logger.error(f"FacebookAdapter.get_page_insights: Unexpected error {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to fetch page insights")
 
-    async def get_instagram_accounts(self, user_id: str):
+    async def get_instagram_accounts(self, user_id: str) -> InstagramAccounts:
         try:
-            pages = await self.get_user_pages(user_id, is_instagram=True)
-            instagram_accounts = []
+            pages = await self.get_facebook_pages(user_id, is_instagram=True)
+            instagram_accounts: InstagramAccounts  = []
             for page in pages.facebook_pages:
                 url = f"https://graph.facebook.com/v21.0/{page.id}"
                 params = {
                     "fields": "connected_instagram_account",
                     "access_token": page.access_token,
                 }
-                resp = await httpx.AsyncClient().get(url, params=params).json()
+
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(url, params=params)
+                    resp = resp.json()
                 
                 if "connected_instagram_account" in resp:
-                    instagram_accounts.append(resp["connected_instagram_account"])
-            return instagram_accounts 
-        except HTTPException:
+                    instagram_accounts.append(InstagramAccount(id=resp["connected_instagram_account"]["id"], name=resp["connected_instagram_account"]["name"], connected_at=page.connected_at))
+            return InstagramAccounts(instagram_accounts=instagram_accounts)
+        except HTTPException as e:
             logger.error(f"HTTP error during get_instagram_accounts: {e.detail}")
             raise
         except Exception as e:
             logger.error(f"FacebookAdapter.get_instagram_accounts: Unexpected error {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to fetch instagram accounts")
+
+    async def get_facebook_and_instagram_accounts(self, user_id: str) -> FacebookAndInstagramAccounts:
+        try:
+            pages_response = await self.get_facebook_pages(user_id, is_instagram=True)
+            pages = pages_response.facebook_pages
+
+            instagram_accounts: list[InstagramAccount] = []
+            for page in pages:
+                url = f"https://graph.facebook.com/v21.0/{page.id}"
+                params = {
+                    "fields": "connected_instagram_account{name,username}",
+                    "access_token": page.access_token,
+                }
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(url, params=params)
+                    resp_json = resp.json()
+                if "connected_instagram_account" in resp_json and resp_json["connected_instagram_account"]:
+                    ig = resp_json["connected_instagram_account"]
+                    instagram_accounts.append(InstagramAccount(
+                        id=ig.get("id", ""),
+                        name=ig.get("username") or ig.get("name") or "",
+                        connected_at=page.connected_at
+                    ))
+
+            return FacebookAndInstagramAccounts(
+                facebook_pages=pages,
+                instagram_accounts=instagram_accounts
+            )
+        except HTTPException as e:
+            logger.error(f"HTTP error during get_facebook_and_instagram_accounts: {e.detail}")
+            raise
+        except Exception as e:
+            logger.error(f"FacebookAdapter.get_facebook_and_instagram_accounts: Unexpected error {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to fetch facebook and instagram accounts")
 
 
     
