@@ -1,11 +1,11 @@
 import logging
-from typing import List
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 import httpx
 from models.user_tokens import FacebookTokenRequest, PlatformType
 from user_tokens.adapter import UserTokenAdapter
-from models.facebook import UserFacebookPages, FacebookPage, PageInsightRequest, InstagramAccounts, InstagramAccount, FacebookAndInstagramAccounts
+from models.facebook import UserFacebookPages, FacebookPage, PageInsightRequest, InstagramAccounts, InstagramAccount, FacebookAndInstagramAccounts, InstagramInsightRequest
+from projects.adapter import ProjectsAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class FacebookAdapter:
     def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
         self.user_token_adapter = UserTokenAdapter(self.db_session)
-    
+        self.projects_adapter = ProjectsAdapter(self.db_session)
     
     async def init_process(self, facebook_token: FacebookTokenRequest, user_id: int) -> bool:
         """
@@ -72,7 +72,7 @@ class FacebookAdapter:
             raise HTTPException(status_code=500, detail="Failed to fetch Facebook pages")
 
 
-    async def get_page_insights(
+    async def get_facebook_page_insights(
         self,
         page_insight_request: PageInsightRequest,
         user_id: str
@@ -83,6 +83,13 @@ class FacebookAdapter:
                 raise HTTPException(status_code=404, detail="Facebook tokens not found")
 
             user_access_token = user_tokens.access_token
+
+            project = await self.projects_adapter.get_or_create_project(page_insight_request.page_id, user_id)
+            if not project:
+                raise HTTPException(status_code=404, detail="An error occurred while fetching project")
+
+            if not project.allow_insights:
+                raise HTTPException(status_code=403, detail="Insights are not allowed for this project")
 
             url_pages = "https://graph.facebook.com/v21.0/me/accounts"
             async with httpx.AsyncClient() as client:
@@ -126,6 +133,51 @@ class FacebookAdapter:
         except Exception as e:
             logger.error(f"FacebookAdapter.get_page_insights: Unexpected error {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to fetch page insights")
+
+    async def get_instagram_insights(
+        self,
+        insight_request: InstagramInsightRequest,
+        user_id: str
+    ):
+        try:
+            user_tokens = await self.user_token_adapter.get_tokens_by_user_id(user_id, PlatformType.facebook)
+            if not user_tokens:
+                raise HTTPException(status_code=404, detail="Facebook tokens not found")
+
+            user_access_token = user_tokens.access_token
+
+            project = await self.projects_adapter.get_or_create_project(insight_request.instagram_id, user_id)
+            if not project:
+                raise HTTPException(status_code=404, detail="An error occurred while fetching project")
+            if not project.allow_insights:
+                raise HTTPException(status_code=403, detail="Insights are not allowed for this project")
+
+            url_insights = f"https://graph.facebook.com/v21.0/{insight_request.instagram_id}/insights"
+            params = {
+                "metric": ",".join(insight_request.metrics),
+                "period": insight_request.period,
+                "access_token": user_access_token,
+            }
+            if insight_request.since:
+                params["since"] = insight_request.since
+            if insight_request.until:
+                params["until"] = insight_request.until
+
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(url_insights, params=params)
+                insights_data = resp.json()
+
+            if "data" not in insights_data:
+                logger.error(f"Failed to fetch insights for instagram {insight_request.instagram_id}: {insights_data}")
+                raise HTTPException(status_code=400, detail="Failed to fetch instagram insights")
+
+            return insights_data["data"]
+        except HTTPException as e:
+            logger.error(f"HTTP error during get_instagram_insights: {e.detail}")
+            raise
+        except Exception as e:
+            logger.error(f"FacebookAdapter.get_instagram_insights: Unexpected error {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to fetch instagram insights")
 
     async def get_instagram_accounts(self, user_id: str) -> InstagramAccounts:
         try:

@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.database import get_async_db
 from fastapi import Depends
 from models.user_tokens import FacebookTokenRequest
-from models.facebook import UserFacebookPages, PageInsightRequest, InstagramAccounts, FacebookAndInstagramAccounts
+from models.facebook import UserFacebookPages, PageInsightRequest, InstagramAccounts, FacebookAndInstagramAccounts, InstagramInsightRequest
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ class FacebookService:
             raise HTTPException(status_code=500, detail="Failed to getting user pages")
 
 
-    async def get_page_insights(
+    async def get_facebook_page_insights(
         self,
         page_insight_request: PageInsightRequest,
         token: str
@@ -57,7 +57,7 @@ class FacebookService:
         try:
             user_id = get_user_id_from_token(token)
             
-            return await self.facebook_adapter.get_page_insights(page_insight_request, user_id)
+            return await self.facebook_adapter.get_facebook_page_insights(page_insight_request, user_id)
         except HTTPException as e:
             logger.error(f"HTTP error during getting page insights: {e.detail}")
             raise
@@ -86,6 +86,21 @@ class FacebookService:
         except Exception as e:
             logger.error(f"Unexpected error during getting facebook and instagram accounts: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to getting facebook and instagram accounts")
+
+    async def get_instagram_insights(
+        self,
+        insight_request: InstagramInsightRequest,
+        token: str
+    ) -> List[dict]:
+        try:
+            user_id = get_user_id_from_token(token)
+            return await self.facebook_adapter.get_instagram_insights(insight_request, user_id)
+        except HTTPException as e:
+            logger.error(f"HTTP error during getting instagram insights: {e.detail}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error during getting instagram insights: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to getting instagram insights")
 
 
 

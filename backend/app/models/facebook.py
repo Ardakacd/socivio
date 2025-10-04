@@ -28,6 +28,13 @@ class InstagramAccount(BaseModel):
 class InstagramAccounts(BaseModel):
     instagram_accounts: list[InstagramAccount]
 
+class InstagramInsightRequest(BaseModel):
+    instagram_id: str
+    metrics: List[str]
+    period: Optional[str] = "day"
+    since: Optional[str] = None
+    until: Optional[str] = None
+
 class FacebookAndInstagramAccounts(BaseModel):
     facebook_pages: list[FacebookPage]
     instagram_accounts: list[InstagramAccount]

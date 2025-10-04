@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from .service import FacebookService, get_facebook_service
 from models.user_tokens import FacebookTokenRequest
-from models.facebook import UserFacebookPages, PageInsightRequest, InstagramAccounts, FacebookAndInstagramAccounts
+from models.facebook import UserFacebookPages, PageInsightRequest, InstagramAccounts, FacebookAndInstagramAccounts, InstagramInsightRequest
 # Configure logging 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ async def get_facebook_pages(
 
 
 @router.post("/page-insights", response_model=list[dict])
-async def get_page_insights(
+async def get_facebook_page_insights(
         page_insight_request: PageInsightRequest,
         credentials: HTTPAuthorizationCredentials = Depends(security),
         facebook_service: FacebookService = Depends(get_facebook_service)):
@@ -65,7 +65,7 @@ async def get_page_insights(
     try:
         token = credentials.credentials
         
-        return await facebook_service.get_page_insights(page_insight_request, token)
+        return await facebook_service.get_facebook_page_insights(page_insight_request, token)
 
     except HTTPException as e:
         logger.error(f"HTTP error during getting page insights: {e.detail}")
@@ -95,6 +95,26 @@ async def get_instagram_accounts(
         logger.error(f"Unexpected error during getting instagram accounts: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to getting instagram accounts")
 
+
+@router.post("/instagram-insights", response_model=list[dict])
+async def get_instagram_insights(
+        instagram_insight_request: InstagramInsightRequest,
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+        facebook_service: FacebookService = Depends(get_facebook_service)):
+    """
+    Returns list of instagram insights.
+    """
+    logger.info(f"Getting instagram insights for user: {credentials.credentials}")
+    try:
+        token = credentials.credentials
+        return await facebook_service.get_instagram_insights(instagram_insight_request, token)
+
+    except HTTPException as e:
+        logger.error(f"HTTP error during getting instagram insights: {e.detail}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error during getting instagram insights: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to getting instagram insights")
 
 @router.get("/get-facebook-and-instagram-accounts", response_model=FacebookAndInstagramAccounts)
 async def get_facebook_and_instagram_accounts(
