@@ -7,7 +7,8 @@ from models.user_tokens import YoutubeTokenRequest
 from user_tokens.adapter import UserTokenAdapter
 import time
 import asyncio
-from models.youtube import YoutubeReportRequest, YoutubeReport, YoutubeChannel, YoutubeChannels
+from models.youtube import YoutubeReportRequest, YoutubeReport, YoutubeChannel, YoutubeChannels, YoutubeAnalyticsResponse
+from models.projects import ProjectInsightResponse
 from datetime import datetime
 from projects.adapter import ProjectsAdapter
 
@@ -276,16 +277,20 @@ class YoutubeAdapter:
             dimensions: Comma-separated dimensions (e.g., "day,country")
             filters: Filter expression (e.g., "country==US")
             ids: The channel or content owner to retrieve data for
+            external_id: The external ID of the user
 
         Returns:
             JSON response from YouTube Analytics API, or None if failed
         """
         try:
-            user_tokens = await self.user_token_adapter.get_tokens_by_user_id(user_id, PlatformType.youtube)
-            if not user_tokens:
+            
+            user_tokens = await self.user_token_adapter.get_tokens_by_user_id(user_id, PlatformType.youtube, youtube_report_request.external_id)
+            
+            if len(user_tokens) == 0:
                 raise HTTPException(status_code=404, detail="YouTube tokens not found")
+            user_tokens = user_tokens[0]
 
-            project = await self.projects_adapter.get_by_user_id(user_id)
+            project = await self.projects_adapter.get_or_create_project(youtube_report_request.ids, user_id)
             if not project:
                 raise HTTPException(status_code=404, detail="An error occurred while fetching project")
 
@@ -326,7 +331,7 @@ class YoutubeAdapter:
                 
                 
                 logger.info("YouTubeAnalyticsAdapter: Report retrieved successfully")
-                return YoutubeReport(report=data.get('rows', []), ids=youtube_report_request.ids)
+                return YoutubeReport(report=YoutubeAnalyticsResponse(kind=data.get('kind'), columnHeaders=data.get('columnHeaders'), rows=data.get('rows')), ids=youtube_report_request.ids, project=ProjectInsightResponse(id=project.id, allow_insights=project.allow_insights, allow_ai_replies=project.allow_ai_replies))
         except HTTPException as e:
             logger.error(f"HTTP error during query report: {e.detail}")
             raise
@@ -355,8 +360,9 @@ class YoutubeAdapter:
             
         
             for user_token in user_tokens:
-                channels_for_token = await self.__get_user_channels_with_access_token(user_token.access_token, user_token.created_at)
-                channels.extend(channels_for_token)
+                channels_for_token = await self.__get_user_channels_with_access_token(user_token.access_token, user_token.created_at, user_token.external_id)
+
+                channels.extend(channels_for_token.youtube_channels)
             
             
             return YoutubeChannels(youtube_channels=channels)
@@ -367,7 +373,7 @@ class YoutubeAdapter:
             logger.error(f"YouTubeAnalyticsAdapter: Unexpected error fetching channels for user {user_id}: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to fetch YouTube channels")
 
-    async def __get_user_channels_with_access_token(self, access_token: str, created_at: datetime) -> list[YoutubeChannel]:
+    async def __get_user_channels_with_access_token(self, access_token: str, created_at: datetime, external_id: str) -> YoutubeChannels:
         """
         Get YouTube channels for the authenticated user.
 
@@ -403,11 +409,13 @@ class YoutubeAdapter:
                         title=item["snippet"]["title"],
                         description=item["snippet"].get("description"),
                         connected_at=created_at,
+                        external_id=external_id,
                     )
                     for item in data.get("items", [])
                 ]
+                
 
-                return channels
+                return YoutubeChannels(youtube_channels=channels)
 
         except HTTPException:
             raise
