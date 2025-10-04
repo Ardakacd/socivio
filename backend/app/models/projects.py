@@ -18,3 +18,8 @@ class ToggleProjectFlag(BaseModel):
     external_account_id: str
     allow: bool
 
+class ProjectInsightResponse(BaseModel):
+    id: str
+    allow_insights: bool
+    allow_ai_replies: bool
+

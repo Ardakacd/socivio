@@ -1,10 +1,12 @@
 import logging
 from fastapi import HTTPException
+from pydantic.dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 import httpx
 from models.user_tokens import FacebookTokenRequest, PlatformType
 from user_tokens.adapter import UserTokenAdapter
-from models.facebook import UserFacebookPages, FacebookPage, PageInsightRequest, InstagramAccounts, InstagramAccount, FacebookAndInstagramAccounts, InstagramInsightRequest
+from models.facebook import UserFacebookPages, FacebookPage, PageInsightRequest, InstagramAccounts, InstagramAccount, FacebookAndInstagramAccounts, InstagramInsightRequest, FacebookPageInsightsResponse, InstagramInsightsResponse
+from models.projects import ProjectInsightResponse
 from projects.adapter import ProjectsAdapter
 
 logger = logging.getLogger(__name__)
@@ -59,8 +61,9 @@ class FacebookAdapter:
                     resp = await client.get(url, params=params)
                     data = resp.json()
 
+                    
                 if "data" in data:
-                    pages.extend([FacebookPage(id=page["id"], name=page["name"], connected_at=token.created_at, access_token=page["access_token"] if is_instagram else None) for page in data["data"]])
+                    pages.extend([FacebookPage(id=page["id"], external_id=token.external_id, name=page["name"], connected_at=token.created_at, access_token=page["access_token"] if is_instagram else None) for page in data["data"]])
             
             return UserFacebookPages(facebook_pages=pages)
 
@@ -76,14 +79,16 @@ class FacebookAdapter:
         self,
         page_insight_request: PageInsightRequest,
         user_id: str
-    ):
+    ) -> FacebookPageInsightsResponse:
         try:
-            user_tokens = await self.user_token_adapter.get_tokens_by_user_id(user_id, PlatformType.facebook)
-            if not user_tokens:
+            user_tokens = await self.user_token_adapter.get_tokens_by_user_id(user_id, PlatformType.facebook, page_insight_request.external_id)
+
+            if len(user_tokens) == 0:
                 raise HTTPException(status_code=404, detail="Facebook tokens not found")
-
+            user_tokens = user_tokens[0]
+            
             user_access_token = user_tokens.access_token
-
+            
             project = await self.projects_adapter.get_or_create_project(page_insight_request.page_id, user_id)
             if not project:
                 raise HTTPException(status_code=404, detail="An error occurred while fetching project")
@@ -125,7 +130,7 @@ class FacebookAdapter:
                 logger.error(f"Failed to fetch insights for page {page_insight_request.page_id}: {insights_data}")
                 raise HTTPException(status_code=400, detail="Failed to fetch page insights")
 
-            return insights_data["data"]
+            return FacebookPageInsightsResponse(data=insights_data["data"], project=ProjectInsightResponse(id=project.id, allow_insights=project.allow_insights, allow_ai_replies=project.allow_ai_replies))
 
         except HTTPException as e:
             logger.error(f"HTTP error during get_page_insights: {e.detail}")
@@ -138,12 +143,12 @@ class FacebookAdapter:
         self,
         insight_request: InstagramInsightRequest,
         user_id: str
-    ):
+    ) -> InstagramInsightsResponse:
         try:
-            user_tokens = await self.user_token_adapter.get_tokens_by_user_id(user_id, PlatformType.facebook)
-            if not user_tokens:
-                raise HTTPException(status_code=404, detail="Facebook tokens not found")
-
+            user_tokens = await self.user_token_adapter.get_tokens_by_user_id(user_id, PlatformType.facebook, insight_request.external_id)
+            if len(user_tokens) == 0:
+                raise HTTPException(status_code=404, detail="Instagram tokens not found")
+            user_tokens = user_tokens[0]
             user_access_token = user_tokens.access_token
 
             project = await self.projects_adapter.get_or_create_project(insight_request.instagram_id, user_id)
@@ -171,7 +176,7 @@ class FacebookAdapter:
                 logger.error(f"Failed to fetch insights for instagram {insight_request.instagram_id}: {insights_data}")
                 raise HTTPException(status_code=400, detail="Failed to fetch instagram insights")
 
-            return insights_data["data"]
+            return InstagramInsightsResponse(data=insights_data["data"], project=ProjectInsightResponse(id=project.id, allow_insights=project.allow_insights, allow_ai_replies=project.allow_ai_replies))
         except HTTPException as e:
             logger.error(f"HTTP error during get_instagram_insights: {e.detail}")
             raise
@@ -195,7 +200,7 @@ class FacebookAdapter:
                     resp = resp.json()
                 
                 if "connected_instagram_account" in resp:
-                    instagram_accounts.append(InstagramAccount(id=resp["connected_instagram_account"]["id"], name=resp["connected_instagram_account"]["name"], connected_at=page.connected_at))
+                    instagram_accounts.append(InstagramAccount(id=resp["connected_instagram_account"]["id"], external_id = page.external_id, name=resp["connected_instagram_account"]["name"], connected_at=page.connected_at))
             return InstagramAccounts(instagram_accounts=instagram_accounts)
         except HTTPException as e:
             logger.error(f"HTTP error during get_instagram_accounts: {e.detail}")
@@ -223,9 +228,12 @@ class FacebookAdapter:
                     ig = resp_json["connected_instagram_account"]
                     instagram_accounts.append(InstagramAccount(
                         id=ig.get("id", ""),
+                        external_id=page.external_id,
                         name=ig.get("username") or ig.get("name") or "",
                         connected_at=page.connected_at
                     ))
+
+            
 
             return FacebookAndInstagramAccounts(
                 facebook_pages=pages,

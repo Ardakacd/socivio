@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from .service import FacebookService, get_facebook_service
 from models.user_tokens import FacebookTokenRequest
-from models.facebook import UserFacebookPages, PageInsightRequest, InstagramAccounts, FacebookAndInstagramAccounts, InstagramInsightRequest
+from models.facebook import UserFacebookPages, PageInsightRequest, InstagramAccounts, FacebookAndInstagramAccounts, InstagramInsightRequest, FacebookPageInsightsResponse, InstagramInsightsResponse
 # Configure logging 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ async def get_facebook_pages(
         raise HTTPException(status_code=500, detail="Failed to getting user pages")
 
 
-@router.post("/page-insights", response_model=list[dict])
+@router.post("/page-insights", response_model=FacebookPageInsightsResponse)
 async def get_facebook_page_insights(
         page_insight_request: PageInsightRequest,
         credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -96,7 +96,7 @@ async def get_instagram_accounts(
         raise HTTPException(status_code=500, detail="Failed to getting instagram accounts")
 
 
-@router.post("/instagram-insights", response_model=list[dict])
+@router.post("/instagram-insights", response_model=InstagramInsightsResponse)
 async def get_instagram_insights(
         instagram_insight_request: InstagramInsightRequest,
         credentials: HTTPAuthorizationCredentials = Depends(security),

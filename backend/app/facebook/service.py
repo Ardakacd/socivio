@@ -1,5 +1,4 @@
 import logging
-from typing import List
 from fastapi import  HTTPException
 from .adapter import FacebookAdapter
 from utils.jwt import get_user_id_from_token
@@ -7,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.database import get_async_db
 from fastapi import Depends
 from models.user_tokens import FacebookTokenRequest
-from models.facebook import UserFacebookPages, PageInsightRequest, InstagramAccounts, FacebookAndInstagramAccounts, InstagramInsightRequest
+from models.facebook import UserFacebookPages, PageInsightRequest, InstagramAccounts, FacebookAndInstagramAccounts, InstagramInsightRequest, InstagramInsightsResponse, FacebookPageInsightsResponse
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -53,7 +52,7 @@ class FacebookService:
         self,
         page_insight_request: PageInsightRequest,
         token: str
-    ) -> List[dict]:
+    ) -> FacebookPageInsightsResponse:
         try:
             user_id = get_user_id_from_token(token)
             
@@ -91,7 +90,7 @@ class FacebookService:
         self,
         insight_request: InstagramInsightRequest,
         token: str
-    ) -> List[dict]:
+    ) -> InstagramInsightsResponse:
         try:
             user_id = get_user_id_from_token(token)
             return await self.facebook_adapter.get_instagram_insights(insight_request, user_id)
