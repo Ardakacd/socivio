@@ -405,8 +405,7 @@ class UserTokenAdapter:
 
                 data = resp.json()
                 logger.info(f"Facebook user info retrieved: {data}")
-                print(data)
-                print('here is the data')
+                
                 return FacebookUserInfo(external_id=data["id"])
                            
 
