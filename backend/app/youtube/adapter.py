@@ -9,7 +9,7 @@ import time
 import asyncio
 from models.youtube import YoutubeReportRequest, YoutubeReport, YoutubeChannel, YoutubeChannels
 from datetime import datetime
-
+from projects.adapter import ProjectsAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,7 @@ class YoutubeAdapter:
     def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
         self.user_token_adapter = UserTokenAdapter(self.db_session)
+        self.projects_adapter = ProjectsAdapter(self.db_session)
     
     
     async def init_process(self, youtube_token: YoutubeTokenRequest, user_id: int) -> bool:
@@ -274,22 +275,31 @@ class YoutubeAdapter:
             metrics: Comma-separated metrics (e.g., "views,likes")
             dimensions: Comma-separated dimensions (e.g., "day,country")
             filters: Filter expression (e.g., "country==US")
-            ids: The channel or content owner to retrieve data for (default: "channel==MINE")
+            ids: The channel or content owner to retrieve data for
 
         Returns:
             JSON response from YouTube Analytics API, or None if failed
         """
         try:
-            print(youtube_report_request)
             user_tokens = await self.user_token_adapter.get_tokens_by_user_id(user_id, PlatformType.youtube)
             if not user_tokens:
                 raise HTTPException(status_code=404, detail="YouTube tokens not found")
+
+            project = await self.projects_adapter.get_by_user_id(user_id)
+            if not project:
+                raise HTTPException(status_code=404, detail="An error occurred while fetching project")
+
+            if not project.allow_insights:
+                raise HTTPException(status_code=403, detail="Insights are not allowed for this project")
             
             
             YOUTUBE_ANALYTICS_BASE_URL = "https://youtubeanalytics.googleapis.com/v2/reports"
 
+            if youtube_report_request.ids.startswith("channel"):
+                raise HTTPException(status_code=400, detail="This type of a channel IDs are not supported for report requests")
+
             params = {
-                "ids": youtube_report_request.ids,
+                "ids": f"channel=={youtube_report_request.ids}",
                 "startDate": youtube_report_request.start_date,
                 "endDate": youtube_report_request.end_date,
                 "metrics": youtube_report_request.metrics,

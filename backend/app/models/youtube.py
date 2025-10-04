@@ -7,7 +7,7 @@ class YoutubeReportRequest(BaseModel):
     metrics: str
     dimensions: str
     filters: str
-    ids: str = "channel==MINE"
+    ids: str
 
 class YoutubeReport(BaseModel):
     report: list[dict]

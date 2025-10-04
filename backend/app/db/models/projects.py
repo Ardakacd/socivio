@@ -1,8 +1,9 @@
-from sqlalchemy import String, Integer, ForeignKey
+from sqlalchemy import String, Integer, ForeignKey, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 from .base import Base
 import uuid
-    
+from sqlalchemy import UniqueConstraint
+
 class ProjectModel(Base):
     __tablename__ = "projects"
 
@@ -15,6 +16,14 @@ class ProjectModel(Base):
 
     # External account reference (Google user id, Meta id, etc.)
     external_account_id: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    allow_insights: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    allow_ai_replies: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "external_account_id", name="uq_user_project"),
+    )
 
     def __repr__(self):
         return f"<ProjectModel(id={self.id}, external_account_id={self.external_account_id})>"
