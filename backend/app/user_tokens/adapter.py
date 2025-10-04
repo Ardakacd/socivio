@@ -1,5 +1,5 @@
-from typing import Optional
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional, List
+from sqlalchemy.ext.asyncio import AsyncSession 
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy import select, delete
 import logging
@@ -139,7 +139,7 @@ class UserTokenAdapter:
             raise HTTPException(status_code=500, detail="Failed to create user token")
 
 
-    async def get_tokens_by_user_id(self, user_id: int, platform: Optional[PlatformType] = None, external_id: Optional[str] = None) -> Optional[UserTokenModel]:
+    async def get_tokens_by_user_id(self, user_id: int, platform: Optional[PlatformType] = None, external_id: Optional[str] = None) -> Optional[List[UserTokenModel]]:
         """
         Retrieve all tokens for a given user_id, filtered by platform.
         
